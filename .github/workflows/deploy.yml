@@ -2,9 +2,8 @@ name: Sync to Hugging Face Spaces
 
 on:
   push:
-    branches: [ main ] # ou 'master' selon la branche principale de ton dépot
+    branches: [ main ] # Change en 'master' si ta branche principale s'appelle master
 
-  # Permet de lancer la synchronisation manuellement depuis GitHub
   workflow_dispatch:
 
 jobs:
@@ -12,14 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v4 # Mis à jour vers v4 pour éliminer l'avertissement Node.js
 
       - name: Push to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Remplace TON_PSEUDO_HF/TON_NOM_DE_SPACE par tes propres identifiants Hugging Face
-          git push https://FloridaTOVANA:$HF_TOKEN@huggingface.co/spaces/FloridaTOVANA/Walmart_marketing_dashboard main
-       
+          git push --force https://FloridaTOVANA:$HF_TOKEN@huggingface.co/spaces/FloridaTOVANA/Walmart_marketing_dashboard main
