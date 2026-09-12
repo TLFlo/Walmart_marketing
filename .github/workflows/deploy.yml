@@ -1,1 +1,23 @@
-# hello deploy
+name: Sync to Hugging Face Spaces
+
+on:
+  push:
+    branches: [ main ] # ou 'master' selon la branche principale de ton dépot
+
+  # Permet de lancer la synchronisation manuellement depuis GitHub
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Push to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git push https://huggingface.co/spaces/FloridaTOVANA/Walmart_marketing_dashboard main
