@@ -19,4 +19,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://FloridaTOVANA:$HF_TOKEN@huggingface.co/spaces/FloridaTOVANA/Walmart_marketing_dashboard main:main
+          git push --force https://FloridaTOVANA:$HF_TOKEN@huggingface.co/spaces/FloridaTOVANA/wallmart-v2 main:main
