@@ -20,4 +20,6 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push https://huggingface.co/spaces/FloridaTOVANA/Walmart_marketing_dashboard main
+          # Remplace TON_PSEUDO_HF/TON_NOM_DE_SPACE par tes propres identifiants Hugging Face
+          git push https://FloridaTOVANA:$HF_TOKEN@huggingface.co/spaces/FloridaTOVANA/Walmart_marketing_dashboard main
+       
