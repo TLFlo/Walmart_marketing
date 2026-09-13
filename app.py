@@ -22,15 +22,31 @@ POWERBI_URL = "https://app.powerbi.com/view?r=eyJrIjoiZmIxZTcxZjEtYjllNi00ODY0LT
 
 
 @st.cache_resource
-def load_ml_model():
-    """Charge le modèle de Machine Learning entraîné (ex: Churn / CLV)."""
-    model_path = "model_churn.pkl"
+def load_ml_artifacts_local():
+    """Charge le dictionnaire (modèle + liste des features) depuis le fichier local churn_model.pkl."""
+    model_path = "churn_model.pkl"
+
     if os.path.exists(model_path):
-        return joblib.load(model_path)
-    return None
+        try:
+            artifacts = joblib.load(model_path)
+            model = artifacts.get("model")
+            features = artifacts.get("features")
+            return model, features
+        except Exception as e:
+            st.error(
+                f"Erreur lors de la lecture du fichier `churn_model.pkl` : {e}"
+            )
+            return None, None
+    else:
+        st.error(
+            "❌ **Fichier `churn_model.pkl` introuvable !** "
+            "Assurez-vous qu'il est bien placé à la racine du dossier du projet."
+        )
+        return None, None
 
 
-model = load_ml_model()
+# Exécution du chargement local
+model, model_features = load_ml_artifacts_local()
 
 # ==========================================
 # 3. BARRE LATÉRALE (SIDEBAR)
@@ -84,103 +100,173 @@ with tab1:
 # ONGLET 2 : FORMULAIRE DE PRÉDICTION ML
 # ==========================================
 with tab2:
-    st.subheader("Prédiction du Churn Client en Temps Réel")
+    st.subheader("🔮 Prédiction du Churn Client en Temps Réel")
     st.markdown(
-        "Remplissez les informations du client pour évaluer son risque de départ à l'aide du modèle pré-entraîné."
+        "Remplissez les informations principales du client ou **sélectionnez un profil type** pour calculer le risque de départ."
     )
 
-    # Formulaire de saisie des caractéristiques (Features)
-    with st.form("prediction_form"):
+    # --- Boutons de simulation rapide (Profil A / Profil B) ---
+    st.markdown("##### 🧪 Charger un profil de test rapide")
+    demo_col1, demo_col2, demo_col3 = st.columns([1, 1, 2])
+
+    preset = None
+    with demo_col1:
+        if st.button("👤 Profil A (Client Fidèle)"):
+            preset = "Profil_A"
+    with demo_col2:
+        if st.button("⚠️ Profil B (Risque Churn)"):
+            preset = "Profil_B"
+
+    # Valeurs par défaut basées sur le choix
+    if preset == "Profil_A":
+        def_age, def_spent, def_freq, def_qty = 32, 1850.0, 12, 24
+        def_tenure, def_span, def_uniq = 300, 280, 10
+        def_gender, def_online = "Homme", True
+    elif preset == "Profil_B":
+        def_age, def_spent, def_freq, def_qty = 48, 45.0, 1, 1
+        def_tenure, def_span, def_uniq = 450, 0, 1
+        def_gender, def_online = "Femme", False
+    else:
+        def_age, def_spent, def_freq, def_qty = 35, 500.0, 5, 10
+        def_tenure, def_span, def_uniq = 180, 120, 4
+        def_gender, def_online = "Homme", True
+
+    # --- Formulaire de saisie utilisateur ---
+    with st.form("churn_prediction_form"):
         col1, col2 = st.columns(2)
 
         with col1:
-            st.markdown("#### 👤 Profil Client")
+            st.markdown("#### 👤 Démographie & Ancienneté")
             age = st.number_input(
-                "Âge du client", min_value=18, max_value=100, value=35
+                "Âge", min_value=18, max_value=100, value=def_age
             )
-            anciennete = st.number_input(
-                "Ancienneté (Mois)", min_value=0, max_value=120, value=24
+            gender_str = st.selectbox(
+                "Genre",
+                ["Homme", "Femme"],
+                index=0 if def_gender == "Homme" else 1,
             )
-            recence = st.number_input(
-                "Jours depuis le dernier achat (Récence)",
+            is_online_shopper = st.checkbox(
+                "Acheteur en ligne habituel", value=def_online
+            )
+            tenure_days = st.number_input(
+                "Jours depuis l'inscription (Tenure Days)",
+                min_value=1,
+                value=def_tenure,
+            )
+            customer_span_days = st.number_input(
+                "Durée d'activité (Span Days)",
                 min_value=0,
-                max_value=365,
-                value=30,
+                value=def_span,
+                help="Nombre de jours entre le 1er et le dernier achat",
             )
 
         with col2:
-            st.markdown("#### 🛒 Historique d'Achat & Marketing")
-            frequence = st.number_input(
+            st.markdown("#### 🛒 Comportement d'Achat")
+            total_spent = st.number_input(
+                "Montant Total Dépensé ($)",
+                min_value=0.0,
+                value=float(def_spent),
+            )
+            frequency = st.number_input(
                 "Nombre total de commandes (Fréquence)",
                 min_value=1,
-                max_value=200,
-                value=8,
+                value=def_freq,
             )
-            montant_total = st.number_input(
-                "Dépenses totales ($)", min_value=0.0, value=450.0
+            total_quantity = st.number_input(
+                "Quantité totale d'articles achetés",
+                min_value=1,
+                value=def_qty,
             )
-            campagnes_cliquees = st.number_input(
-                "Nombre de campagnes réagies",
-                min_value=0,
-                max_value=20,
-                value=3,
+            unique_products = st.number_input(
+                "Nombre de produits uniques achetés",
+                min_value=1,
+                value=def_uniq,
             )
 
         submit_btn = st.form_submit_button(
-            "🚀 Lancer la Prédiction", use_container_width=True
+            "🚀 Calculez le risque de Churn", use_container_width=True
         )
 
-    # Logique de calcul du résultat
+    # --- Calculs & Prédictions ---
     if submit_btn:
-        if model is not None:
-            # Construction du tableau de données (doit correspondre à l'ordre des features d'entraînement)
-            input_features = np.array(
-                [[age, anciennete, recence, frequence, montant_total, campagnes_cliquees]]
-            )
+        if model is not None and model_features is not None:
+            # Encoding basique
+            gender_encoded = 1 if gender_str == "Homme" else 0
+            online_encoded = 1 if is_online_shopper else 0
 
-            # Calcul de la prédiction
-            prediction = model.predict(input_features)[0]
-
-            # Vérification de la disponibilité des probabilités
-            has_proba = hasattr(model, "predict_proba")
-            probability = (
-                model.predict_proba(input_features)[0][1] * 100
-                if has_proba
-                else None
+            # Calcul automatique des métriques dérivées (Feature Engineering)
+            avg_basket = total_spent / frequency if frequency > 0 else 0
+            purchase_rate = frequency / (tenure_days + 1)
+            avg_item_price = (
+                total_spent / total_quantity if total_quantity > 0 else 0
             )
+            monetary_velocity = total_spent / (tenure_days + 1)
+            basket_depth = (
+                unique_products / (frequency + 1)
+            )  # Ratio d'exploration du catalogue
+
+            # Construction du DataFrame avec exactement les clés attendues par le modèle
+            input_dict = {
+                "Age": age,
+                "Total_Spent": total_spent,
+                "Frequency": frequency,
+                "Avg_Basket": avg_basket,
+                "Total_Quantity": total_quantity,
+                "Tenure_Days": tenure_days,
+                "Customer_Span_Days": customer_span_days,
+                "Purchase_Rate": purchase_rate,
+                "Avg_Item_Price": avg_item_price,
+                "Unique_Products": unique_products,
+                "Monetary_Velocity": monetary_velocity,
+                "Basket_Depth": basket_depth,
+                "Gender_Encoded": gender_encoded,
+                "Is_Online_Shopper": online_encoded,
+            }
+
+            input_df = pd.DataFrame([input_dict])
+
+            # Assurer l'ordre exact des colonnes requis par model_features
+            input_df = input_df[model_features]
+
+            # Prédiction & Probabilité
+            prediction = model.predict(input_df)[0]
+            probability = model.predict_proba(input_df)[0][1] * 100
 
             st.divider()
 
-            # Affichage visuel des résultats
+            # --- Affichage des Résultats ---
             res_col1, res_col2 = st.columns([2, 1])
 
             with res_col1:
-                if prediction == 1:
-                    st.error("⚠️ **Diagnostic : Risque élevé de Churn !**")
+                if probability >= 50:
+                    st.error(
+                        f"⚠️ **Diagnostic : Risque Élevé de Départ ({probability:.1f}%)**"
+                    )
                     st.write(
-                        "Ce client présente un comportement similaire aux clients ayant abandonné la plateforme."
+                        "Ce profil montre un décrochage net d'activité par rapport à son ancienneté."
                     )
                     st.info(
-                        "💡 **Action Recommandée :** Attribuer un bon de réduction ciblé ou proposer une offre de fidélisation prioritaire."
+                        "💡 **Recommandation Marketing :** Déclencher une campagne de ré-engagement par e-mail avec un bon de réduction personnalisé."
                     )
                 else:
-                    st.success("✅ **Diagnostic : Client Fidèle**")
+                    st.success(
+                        f"✅ **Diagnostic : Client Fidèle (Risque de Churn : {probability:.1f}%)**"
+                    )
                     st.write(
-                        "Le client présente un engagement satisfaisant et un faible risque de départ."
+                        "Le client présente un comportement d'achat régulier et une bonne vélocité monétaire."
                     )
                     st.info(
-                        "💡 **Action Recommandée :** Intégrer au programme ambassadeur et proposer du Cross-selling."
+                        "💡 **Recommandation Marketing :** Proposer un programme VIP / Vente croisée (Cross-selling)."
                     )
 
             with res_col2:
-                if probability is not None:
-                    st.metric(
-                        label="Probabilité de départ",
-                        value=f"{probability:.1f} %",
-                        delta=f"{'- High Risk' if prediction == 1 else 'Low Risk'}",
-                        delta_color="inverse" if prediction == 1 else "normal",
-                    )
+                st.metric(
+                    label="Score de Churn",
+                    value=f"{probability:.1f} %",
+                    delta="Élevé" if probability >= 50 else "Faible",
+                    delta_color="inverse" if probability >= 50 else "normal",
+                )
         else:
             st.error(
-                "❌ **Fichier modèle introuvable.** Assurez-vous que le fichier `model_churn.pkl` est présent à la racine de votre dossier."
+                "❌ Impossible d'effectuer la prédiction : Le modèle ou la liste des caractéristiques n'ont pas pu être chargés depuis le fichier `churn_model.pkl`."
             )
